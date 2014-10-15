@@ -56,8 +56,8 @@ public:
     // LogAlpha0 is used to make error data scale invariant
     if(bPointToLine)  {
       // Ratio of containing diagonal image rectangle over image area
-      double D = sqrt(w2*(double)w2 + h2*(double)h2); // diameter
-      double A = w2*(double)h2; // area
+      const double D = sqrt(w2*(double)w2 + h2*(double)h2); // diameter
+      const double A = w2*(double)h2; // area
       logalpha0_ = log10(2.0*D/A /N2_(0,0));
     }
     else  {
@@ -70,8 +70,8 @@ public:
   enum { MAX_MODELS = Solver::MAX_MODELS };
 
   void Fit(const std::vector<size_t> &samples, std::vector<Model> *models) const {
-    Mat x1 = ExtractColumns(x1_, samples);
-    Mat x2 = ExtractColumns(x2_, samples);
+    const Mat x1 = ExtractColumns(x1_, samples);
+    const Mat x2 = ExtractColumns(x2_, samples);
     Solver::Solve(x1, x2, models);
   }
 
@@ -136,8 +136,8 @@ public:
   enum { MAX_MODELS = Solver::MAX_MODELS };
 
   void Fit(const std::vector<size_t> &samples, std::vector<Model> *models) const {
-    Mat x1 = ExtractColumns(x2d_, samples);
-    Mat x2 = ExtractColumns(x3D_, samples);
+    const Mat x1 = ExtractColumns(x2d_, samples);
+    const Mat x2 = ExtractColumns(x3D_, samples);
     Solver::Solve(x1, x2, models);
   }
 
@@ -194,8 +194,8 @@ public:
   enum { MAX_MODELS = Solver::MAX_MODELS };
 
   void Fit(const std::vector<size_t> &samples, std::vector<Model> *models) const {
-    Mat x1 = ExtractColumns(x2d_, samples);
-    Mat x2 = ExtractColumns(x3D_, samples);
+    const Mat x1 = ExtractColumns(x2d_, samples);
+    const Mat x2 = ExtractColumns(x3D_, samples);
     Solver::Solve(x1, x2, models);
   }
 
@@ -251,8 +251,8 @@ public:
     ApplyTransformationToPoints(x3D_, K2_.inverse(), &x2k_);
 
     //Point to line probability (line is the epipolar line)
-    double D = sqrt(w2*(double)w2 + h2*(double)h2); // diameter
-    double A = w2*(double)h2; // area
+    const double D = sqrt(w2*(double)w2 + h2*(double)h2); // diameter
+    const double A = w2*(double)h2; // area
     logalpha0_ = log10(2.0*D/A * .5);
   }
 
@@ -260,8 +260,8 @@ public:
   enum { MAX_MODELS = Solver::MAX_MODELS };
 
   void Fit(const std::vector<size_t> &samples, std::vector<Model> *models) const {
-    Mat x1 = ExtractColumns(x1k_, samples);
-    Mat x2 = ExtractColumns(x2k_, samples);
+    const Mat x1 = ExtractColumns(x1k_, samples);
+    const Mat x2 = ExtractColumns(x2k_, samples);
     Solver::Solve(x1, x2, models);
   }
 

@@ -134,6 +134,7 @@ struct VO_Monocular
     {
        // re-localization
     }
+    return bTrackerStatus;
   }
 };
 

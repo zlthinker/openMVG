@@ -77,13 +77,14 @@ IF(USE_OPENCV)
     MESSAGE(STATUS "WARNING: OpenCV was not found. ")
   ELSE(NOT OpenCV_FOUND)
 
+  INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
+
   ADD_EXECUTABLE(openMVG_main_computeMatches_OpenCV main_computeMatches_OpenCV.cpp)
   TARGET_LINK_LIBRARIES(openMVG_main_computeMatches_OpenCV
                         ${OpenMVG_LIBS}
                         ${OpenCV_LIBS})
 
   SET_PROPERTY(TARGET openMVG_main_computeMatches_OpenCV PROPERTY FOLDER OpenMVG/software)
-  INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
   ENDIF(NOT OpenCV_FOUND)
 ENDIF(USE_OPENCV)
 

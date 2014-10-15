@@ -11,6 +11,7 @@
 #include "software/VO/CGlWindow.hpp"
 #include "software/VO/Monocular_VO.hpp"
 #include "software/VO/Tracker.hpp"
+#include "software/VO/Pose_Estimation.hpp"
 
 #include "openMVG/split/split.hpp"
 #include "third_party/cmdLine/cmdLine.h"
