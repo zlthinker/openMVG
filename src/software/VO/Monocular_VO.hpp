@@ -9,6 +9,7 @@
 #define MONOCULAR_VO_HPP
 
 #include <deque>
+#include <set>
 
 namespace openMVG  {
 namespace VO  {
@@ -39,6 +40,8 @@ struct VO_Monocular
   std::deque<Landmark> _landmark;
   std::vector<size_t> _trackedLandmarkIds;
 
+  // Landmark Id per frame (for easier pairing)
+  std::deque< std::set<size_t> > _landmarkListPerFrame;
   // Tracking
   Tracker_T _tracker;
   int _maxTrackedFeatures ;
@@ -57,7 +60,7 @@ struct VO_Monocular
   bool nextFrame(const Image<unsigned char> & ima, const size_t frameId)
   {
     bool bTrackerStatus = _tracker.track(ima, _pt_to_track, _pt_tracked, _tracking_status);
-
+    _landmarkListPerFrame.push_back(std::set<size_t>());
     {
       // Update landmark observation
       // Update tracking point set (if necessary)
@@ -78,6 +81,7 @@ struct VO_Monocular
           {
             const size_t tracker_landmark_id = _trackedLandmarkIds[i];
             _landmark[tracker_landmark_id]._obs.push_back(Measurement(frameId, b.coords()));
+            _landmarkListPerFrame.back().insert(tracker_landmark_id);
             _pt_to_track[i] = b; // update the tracked point
           }
           else // too much motion
@@ -122,6 +126,7 @@ struct VO_Monocular
             _landmark.push_back(landmark);
             // a new landmark ID have be tracked
             _trackedLandmarkIds[i] = _landmark.size()-1;
+            _landmarkListPerFrame.back().insert(_landmark.size() - 1);
 
             _pt_to_track[i] = new_pt[j];
             ++j;

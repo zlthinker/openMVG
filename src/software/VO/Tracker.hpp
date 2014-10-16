@@ -67,8 +67,13 @@ struct Tracker_opencv_KLT
     cv::Mat current_img;
     cv::eigen2cv(ima.GetMat(), current_img);
     std::vector<cv::KeyPoint> m_nextKeypoints;
+    
     cv::Ptr<cv::FeatureDetector> m_detector = cv::FeatureDetector::create("GridFAST");
+    if (m_detector == NULL)
+      m_detector = cv::FeatureDetector::create("FAST");
+    
     m_detector->detect(current_img, m_nextKeypoints);
+    
     if (m_nextKeypoints.size() > count)
     {
       // shuffle to avoid to sample only in one bucket

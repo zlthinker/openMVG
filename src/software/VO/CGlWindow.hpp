@@ -66,9 +66,9 @@ struct CGlWindow
     glBegin(GL_QUADS);
     glColor4f(1.f, 1.f, 1.f, 1.f);
     glTexCoord2f(0.0f, 0.0f); glVertex3f(0.f, 0.f, 0.0f);
-    glTexCoord2f(1.0f, 0.0f); glVertex3f(W, 0.0f, 0.0f);
-    glTexCoord2f(1.0f, 1.0f); glVertex3f(W, H, 0.0f);
-    glTexCoord2f(0.0f, 1.0f); glVertex3f(0.f, H, 0.0f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(GLfloat(W), 0.0f, 0.0f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(GLfloat(W), GLfloat(H), 0.0f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(0.f, GLfloat(H), 0.0f);
     glEnd();
   }
 
