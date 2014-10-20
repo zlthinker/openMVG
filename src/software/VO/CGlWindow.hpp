@@ -9,6 +9,9 @@
 #define CGLWINDOW_HPP
 
 //include header file for glfw library so that we can use OpenGL
+#if defined(__APPLE__)
+#include <OpenGL/gl.h>
+#endif
 #include <GLFW/glfw3.h>
 
 using namespace std;
