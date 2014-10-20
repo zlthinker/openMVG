@@ -42,6 +42,7 @@ struct VO_Monocular
 
   // Landmark Id per frame (for easier pairing)
   std::deque< std::set<size_t> > _landmarkListPerFrame;
+  
   // Tracking
   Tracker_T _tracker;
   int _maxTrackedFeatures ;
@@ -50,6 +51,9 @@ struct VO_Monocular
 
   // Camera intrinsic
   Mat3 _K;
+
+  // 3DPoses
+  std::map<size_t, Mat34> _keyframesPoses;
 
   VO_Monocular(const Mat3 & K, const int maxTrackedFeatures = 500):
     _maxTrackedFeatures(maxTrackedFeatures),
@@ -98,6 +102,18 @@ struct VO_Monocular
       // Count the number of tracked features
       const size_t countTracked = accumulate(_tracking_status.begin(), _tracking_status.end(), 0);
       std::cout << "#tracked: " << countTracked << std::endl;
+
+      // try compute pose and decide if it's a Keyframe
+      if (frameId > 0 && _landmarkListPerFrame.size() > 1)
+      {
+        size_t lastKf = 0;
+        std::vector<size_t> ids;
+        std::set_intersection(
+          _landmarkListPerFrame[lastKf].begin(), _landmarkListPerFrame[lastKf].end(),
+          _landmarkListPerFrame[frameId].begin(), _landmarkListPerFrame[frameId].end(),
+          std::back_inserter(ids));
+        std::cout << "Track in common: " << ids.size() << std::endl;
+      }
 
       // Update tracking point set (if necessary)
       if (countTracked < _maxTrackedFeatures)

@@ -109,7 +109,17 @@ int main(int argc, char **argv)
   //  . track features
   //  . perform VO
 
-  std::vector<std::string> vec_image = stlplus::folder_files( sImaDirectory );
+  std::vector<std::string> vec_image = stlplus::folder_files(sImaDirectory);
+  // clean invalid image file
+  {
+    std::vector<std::string> vec_image_;
+    for (size_t i = 0; i < vec_image.size(); ++i)
+    {
+      if (openMVG::GetFormat(vec_image[i].c_str()) != openMVG::Unknown)
+        vec_image_.push_back(vec_image[i]);
+    }
+    vec_image_.swap(vec_image);
+  }
   std::sort(vec_image.begin(), vec_image.end());
 
   Image<unsigned char> currentImage;
