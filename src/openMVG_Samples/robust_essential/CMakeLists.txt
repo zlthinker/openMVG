@@ -1,4 +1,4 @@
-
+INCLUDE_DIRECTORIES("/Users/Larry/openMVG/src/dependencies/cereal/include" "/Users/Larry/openMVG/src/" "/usr/local/include/eigen3/")
 ADD_DEFINITIONS(-DTHIS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
 ADD_EXECUTABLE(openMVG_sample_robustEssential robust_essential.cpp)

@@ -35,7 +35,7 @@ using namespace std;
 bool readIntrinsic(const std::string & fileName, Mat3 & K);
 
 /// Export 3D point vector and camera position to PLY format
-bool exportToPly(const std::vector<Vec3> & vec_points,
+bool exportToPly(const std::vector<Vec3> & vec_points, const std::vector<Vec3> & vec_colors,
   const std::vector<Vec3> & vec_camPos,
   const std::string & sFileName);
 
@@ -59,6 +59,7 @@ int main() {
   image_describer->Describe(imageL, regions_perImage[0]);
   image_describer->Describe(imageR, regions_perImage[1]);
 
+  //get feature points
   const SIFT_Regions* regionsL = dynamic_cast<SIFT_Regions*>(regions_perImage.at(0).get());
   const SIFT_Regions* regionsR = dynamic_cast<SIFT_Regions*>(regions_perImage.at(1).get());
 
@@ -186,6 +187,7 @@ int main() {
 
     //C. Triangulate and export inliers as a PLY scene
     std::vector<Vec3> vec_3DPoints;
+    std::vector<Vec3> vec_3DColors;
 
     // Setup camera intrinsic and poses
     Pinhole_Intrinsic intrinsic0(imageL.Width(), imageL.Height(), K(0, 0), K(0, 2), K(1, 2));
@@ -204,7 +206,9 @@ int main() {
       const SIOPointFeature & RR = regionsR->Features()[vec_PutativeMatches[relativePose_info.vec_inliers[i]]._j];
       // Point triangulation
       Vec3 X;
+      Vec3 X_Color;
       TriangulateDLT(P1, LL.coords().cast<double>(), P2, RR.coords().cast<double>(), &X);
+      X_Color[0] = X_Color[1] = X_Color[2] = (imageL((int)LL.coords()[1], (int)LL.coords()[0]) + imageR((int)RR.coords()[1], (int)RR.coords()[0])) / 2;
       // Reject point that is behind the camera
       if (pose0.depth(X) < 0 && pose1.depth(X) < 0)
         continue;
@@ -214,6 +218,8 @@ int main() {
       vec_residuals.push_back(fabs(residual0(1)));
       vec_residuals.push_back(fabs(residual1(0)));
       vec_residuals.push_back(fabs(residual1(1)));
+      vec_3DPoints.push_back(X);
+      vec_3DColors.push_back(X_Color);
     }
 
     // Display some statistics of reprojection errors
@@ -232,7 +238,7 @@ int main() {
       std::vector<Vec3> vec_camPos;
       vec_camPos.push_back( pose0.center() );
       vec_camPos.push_back( pose1.center() );
-      exportToPly(vec_3DPoints, vec_camPos, "EssentialGeometry.ply");
+      exportToPly(vec_3DPoints, vec_3DColors, vec_camPos, "EssentialGeometry.ply");
   }
   return EXIT_SUCCESS;
 }
@@ -256,7 +262,7 @@ bool readIntrinsic(const std::string & fileName, Mat3 & K)
 }
 
 /// Export 3D point vector and camera position to PLY format
-bool exportToPly(const std::vector<Vec3> & vec_points,
+bool exportToPly(const std::vector<Vec3> & vec_points, const std::vector<Vec3> & vec_colors,
   const std::vector<Vec3> & vec_camPos,
   const std::string & sFileName)
 {
@@ -276,7 +282,7 @@ bool exportToPly(const std::vector<Vec3> & vec_points,
 
   for (size_t i=0; i < vec_points.size(); ++i)  {
       outfile << vec_points[i].transpose()
-      << " 255 255 255" << "\n";
+      << " " << vec_colors[i].transpose() << "\n";
   }
 
   for (size_t i=0; i < vec_camPos.size(); ++i)  {

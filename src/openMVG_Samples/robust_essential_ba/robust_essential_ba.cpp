@@ -48,10 +48,10 @@ bool readIntrinsic(const std::string & fileName, Mat3 & K);
 int main() {
 
   const std::string sInputDir = stlplus::folder_up(string(THIS_SOURCE_DIR))
-    + "/imageData/SceauxCastle/";
+    + "/imageData/SFMDir/";
   Image<RGBColor> image;
-  const string jpg_filenameL = sInputDir + "100_7101.jpg";
-  const string jpg_filenameR = sInputDir + "100_7102.jpg";
+  const string jpg_filenameL = sInputDir + "bottle1.jpg";
+  const string jpg_filenameR = sInputDir + "bottle2.jpg";
 
   Image<unsigned char> imageL, imageR;
   ReadImage(jpg_filenameL.c_str(), &imageL);
@@ -235,6 +235,7 @@ int main() {
     const Pose3 pose1 = tiny_scene.poses[tiny_scene.views[1]->id_pose] = relativePose_info.relativePose;
 
     // Init structure by inlier triangulation
+    //get projection matrix
     const Mat34 P1 = tiny_scene.intrinsics[tiny_scene.views[0]->id_intrinsic]->get_projective_equivalent(pose0);
     const Mat34 P2 = tiny_scene.intrinsics[tiny_scene.views[1]->id_intrinsic]->get_projective_equivalent(pose1);
     Landmarks & landmarks = tiny_scene.structure;

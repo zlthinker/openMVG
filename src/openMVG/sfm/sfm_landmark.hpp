@@ -49,6 +49,7 @@ struct Landmark
 {
   Observations obs;
   Vec3 X;
+  Vec3 RGB;
 
   // Serialization
   template <class Archive>

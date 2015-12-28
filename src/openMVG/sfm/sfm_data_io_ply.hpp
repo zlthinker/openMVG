@@ -47,10 +47,16 @@ static bool Save_PLY(
       << '\n' << "element vertex "
         // Vertex count: (#landmark + #view_with_valid_pose)
         << ((b_structure ? sfm_data.GetLandmarks().size() : 0) +
-            view_with_pose_count)
+            view_with_pose_count * 5)
       << '\n' << "property float x"
       << '\n' << "property float y"
       << '\n' << "property float z"
+      << '\n' << "property uchar red"
+      << '\n' << "property uchar green"
+      << '\n' << "property uchar blue"
+      << '\n' << "element edge " << view_with_pose_count * 8
+      << '\n' << "property int vertex1"
+      << '\n' << "property int vertex2"
       << '\n' << "property uchar red"
       << '\n' << "property uchar green"
       << '\n' << "property uchar blue"
@@ -63,8 +69,23 @@ static bool Save_PLY(
           if (sfm_data.IsPoseAndIntrinsicDefined(view.second.get()))
           {
             const geometry::Pose3 pose = sfm_data.GetPoseOrDie(view.second.get());
+            Mat3 rotation = pose.rotation();
+            Vec3 center = pose.center();
+            float len = 0.5;
+            Vec3 X1 = Vec3(len, len, len);
+            Vec3 X2 = Vec3(len, -len, len);
+            Vec3 X3 = Vec3(-len, -len, len);
+            Vec3 X4 = Vec3(-len, len, len);
+            Vec3 X1_trans = rotation.transpose() * X1 + center;
+            Vec3 X2_trans = rotation.transpose() * X2 + center;
+            Vec3 X3_trans = rotation.transpose() * X3 + center;
+            Vec3 X4_trans = rotation.transpose() * X4 + center;
             stream << pose.center().transpose()
-              << " 0 255 0" << "\n";
+              << " 0 255 0" << "\n"
+            << X1_trans.transpose() << " 0 255 0" << "\n"
+            << X2_trans.transpose() << " 0 255 0" << "\n"
+            << X3_trans.transpose() << " 0 255 0" << "\n"
+            << X4_trans.transpose() << " 0 255 0" << "\n";
           }
         }
       }
@@ -75,8 +96,19 @@ static bool Save_PLY(
         for (Landmarks::const_iterator iterLandmarks = landmarks.begin();
           iterLandmarks != landmarks.end();
           ++iterLandmarks)  {
-          stream << iterLandmarks->second.X.transpose() << " 255 255 255" << "\n";
+          stream << iterLandmarks->second.X.transpose() << " " << iterLandmarks->second.RGB.transpose() << "\n";
         }
+      }
+
+      for(int i = 0; i < view_with_pose_count; i++) {
+        stream << 5 * i << " " << 5 * i + 1 << " 255 255 255" << std::endl
+        << 5 * i << " " << 5 * i + 2 << " 255 255 255" << std::endl
+        << 5 * i << " " << 5 * i + 3 << " 255 255 255" << std::endl
+        << 5 * i << " " << 5 * i + 4 << " 255 255 255" << std::endl
+        << 5 * i + 1 << " " << 5 * i + 2 << " 255 255 255" << std::endl
+        << 5 * i + 2 << " " << 5 * i + 3 << " 255 255 255" << std::endl
+        << 5 * i + 3 << " " << 5 * i + 4 << " 255 255 255" << std::endl
+        << 5 * i + 4 << " " << 5 * i + 1 << " 255 255 255" << std::endl;
       }
       stream.flush();
       bOk = stream.good();
