@@ -19,6 +19,7 @@
 #include <iostream>
 #include <dirent.h>
 #include <third_party/ceres-solver/internal/ceres/gtest/gtest.h>
+#include <queue>
 
 using namespace openMVG;
 using namespace openMVG::image;
@@ -96,7 +97,7 @@ int main() {
     sfm_data.poses[sfm_data.views[0]->id_pose] = Pose3(Mat3::Identity(), Vec3::Zero());
     image_describer->Describe(image_set[0], regions_perImage[0]);
 
-    /********** match first image with every other image **********/
+    /********** match adjacent two images **********/
     for(int k = 0; k < view_num - 1; k++) {
         const SIFT_Regions *regionsL = dynamic_cast<SIFT_Regions *>(regions_perImage.at(k).get());
         const PointFeatures featsL = regions_perImage.at(k)->GetRegionsPositions();
@@ -299,7 +300,16 @@ int main() {
             Save(sfm_data, output, ESfM_Data(ALL));
         }
     }
-    
+/*
+    //perform dense match
+    std::vector<IndMatch> vec_Matches = matches_provider._pairWise_matches.find(Pair(0, 1));
+    PointFeatures feats0 = regions_perImage.at(0)->GetRegionsPositions();
+    PointFeatures feats1 = regions_perImage.at(1)->GetRegionsPositions();
+
+    std::priority_queue<IndMatch> pq_matches;
+
+*/
+
 
 
 /*
@@ -392,40 +402,6 @@ int readIntrinsic(const std::string & fileName, Mat3 & K)
         return -3;
     }
 
-/*    printf("Camera make : %s\n", result.Make.c_str());
-    printf("Camera model : %s\n", result.Model.c_str());
-    printf("Software : %s\n", result.Software.c_str());
-    printf("Bits per sample : %d\n", result.BitsPerSample);
-    printf("Image width : %d\n", result.ImageWidth);
-    printf("Image height : %d\n", result.ImageHeight);
-    printf("Image description : %s\n", result.ImageDescription.c_str());
-    printf("Image orientation : %d\n", result.Orientation);
-    printf("Image copyright : %s\n", result.Copyright.c_str());
-    printf("Image date/time : %s\n", result.DateTime.c_str());
-    printf("Original date/time : %s\n", result.DateTimeOriginal.c_str());
-    printf("Digitize date/time : %s\n", result.DateTimeDigitized.c_str());
-    printf("Subsecond time : %s\n", result.SubSecTimeOriginal.c_str());
-    printf("Exposure time : 1/%d s\n",
-           (unsigned)(1.0 / result.ExposureTime));
-    printf("F-stop : f/%.1f\n", result.FNumber);
-    printf("ISO speed : %d\n", result.ISOSpeedRatings);
-    printf("Subject distance : %f m\n", result.SubjectDistance);
-    printf("Exposure bias : %f EV\n", result.ExposureBiasValue);
-    printf("Flash used? : %d\n", result.Flash);
-    printf("Metering mode : %d\n", result.MeteringMode);
-    printf("Lens focal length : %f mm\n", result.FocalLength);
-    printf("35mm focal length : %u mm\n", result.FocalLengthIn35mm);
-    printf("GPS Latitude : %f deg (%f deg, %f min, %f sec %c)\n",
-           result.GeoLocation.Latitude, result.GeoLocation.LatComponents.degrees,
-           result.GeoLocation.LatComponents.minutes,
-           result.GeoLocation.LatComponents.seconds,
-           result.GeoLocation.LatComponents.direction);
-    printf("GPS Longitude : %f deg (%f deg, %f min, %f sec %c)\n",
-           result.GeoLocation.Longitude, result.GeoLocation.LonComponents.degrees,
-           result.GeoLocation.LonComponents.minutes,
-           result.GeoLocation.LonComponents.seconds,
-           result.GeoLocation.LonComponents.direction);
-    printf("GPS Altitude : %f m\n", result.GeoLocation.Altitude);*/
 
     double CCD_width = 0;
     double f = 0;
@@ -488,3 +464,12 @@ double zncc(Image<unsigned char> image1, int x1, int y1, Image<unsigned char> im
 
     return ret;
 }
+
+/*
+struct cmp{
+    bool operator() ( IndMatch a, IndMatch b ){
+        if( a.x== b.x ) return a.y> b.y;
+
+        return a.x> b.x; }
+};
+ */
