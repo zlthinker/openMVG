@@ -44,6 +44,21 @@ Image<unsigned char> image0;
 Image<unsigned char> image1;
 int halfWindowSize = 2;
 
+struct cmp{
+    bool operator() ( IndMatch a, IndMatch b ){
+        IndexT a_left = a._i, a_right = a._j;
+        IndexT b_left = b._i, b_right = b._j;
+        features::PointFeature a_left_feat = feats0[a_left];
+        features::PointFeature a_right_feat = feats0[a_right];
+        features::PointFeature b_left_feat = feats1[b_left];
+        features::PointFeature b_right_feat = feats1[b_right];
+
+        double a_zncc = zncc(image0, (int)a_left_feat.x(), (int)a_left_feat.y(), image1, (int)a_right_feat.x(), (int)a_right_feat.y(), halfWindowSize);
+        double b_zncc = zncc(image0, (int)b_left_feat.x(), (int)b_left_feat.y(), image1, (int)b_right_feat.x(), (int)b_right_feat.y(), halfWindowSize);
+
+        return a_zncc > b_zncc; }
+};
+
 
 int main() {
     const std::string sInputDir = stlplus::folder_up(string(THIS_SOURCE_DIR))
@@ -438,21 +453,6 @@ int main() {
     */
 
 }
-
-struct cmp{
-    bool operator() ( IndMatch a, IndMatch b ){
-        IndexT a_left = a._i, a_right = a._j;
-        IndexT b_left = b._i, b_right = b._j;
-        features::PointFeature a_left_feat = feats0[a_left];
-        features::PointFeature a_right_feat = feats0[a_right];
-        features::PointFeature b_left_feat = feats1[b_left];
-        features::PointFeature b_right_feat = feats1[b_right];
-
-        double a_zncc = zncc(image0, (int)a_left_feat.x(), (int)a_left_feat.y(), image1, (int)a_right_feat.x(), (int)a_right_feat.y(), halfWindowSize);
-        double b_zncc = zncc(image0, (int)b_left_feat.x(), (int)b_left_feat.y(), image1, (int)b_right_feat.x(), (int)b_right_feat.y(), halfWindowSize);
-
-        return a_zncc > b_zncc; }
-};
 
 
 int readIntrinsic(const std::string & fileName, Mat3 & K)
