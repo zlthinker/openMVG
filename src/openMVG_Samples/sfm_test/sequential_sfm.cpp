@@ -35,6 +35,14 @@ using namespace std;
 /// 0 F ppy
 /// 0 0 1
 int readIntrinsic(const std::string & fileName, Mat3 & K);
+double zncc(Image<unsigned char> image1, int x1, int y1, Image<unsigned char> image2, int x2, int y2, int halfWindowSize);
+
+IndMatches vec_Matches;
+features::PointFeatures feats0;
+features::PointFeatures feats1;
+Image<unsigned char> image0;
+Image<unsigned char> image1;
+int halfWindowSize = 2;
 
 
 int main() {
@@ -300,15 +308,74 @@ int main() {
             Save(sfm_data, output, ESfM_Data(ALL));
         }
     }
-/*
+
     //perform dense match
-    std::vector<IndMatch> vec_Matches = matches_provider._pairWise_matches.find(Pair(0, 1));
-    PointFeatures feats0 = regions_perImage.at(0)->GetRegionsPositions();
-    PointFeatures feats1 = regions_perImage.at(1)->GetRegionsPositions();
+    vec_Matches = matches_provider._pairWise_matches.at(Pair(0, 1));
+    feats0 = regions_perImage.at(0)->GetRegionsPositions();
+    feats1 = regions_perImage.at(1)->GetRegionsPositions();
+    image0 = image_set.at(0);
+    image1 = image_set.at(1);
 
-    std::priority_queue<IndMatch> pq_matches;
+    Mat matched0 = Mat::Zero(image0.Width(), image0.Height());
+    Mat matched1 = Mat::Zero(image1.Width(), image1.Height());
 
-*/
+    std::priority_queue<IndMatch, vector<IndMatch>, cmp> pq_matches;
+    int cnt = 0;
+    for(IndMatch match : vec_Matches) {
+        pq_matches.push(match);
+        matched0((int)feats0[match._i].x(), (int)feats0[match._i].y()) = 1;
+        matched1((int)feats1[match._j].x(), (int)feats1[match._j].y()) = 1;
+        double cur_zncc = zncc(image0, (int)feats0[match._i].x(), (int)feats0[match._i].y(), image1, (int)feats1[match._j].x(), (int)feats1[match._j].y(), halfWindowSize);
+        cout << cnt++ << ": correlation between matched points: " << cur_zncc << endl;
+    }
+
+/*    while(!pq_matches.empty()) {
+        IndMatch cur_match = pq_matches.top();
+        pq_matches.pop();
+
+        int x0 = (int)feats0[cur_match._i].x(), y0 = (int)feats0[cur_match._i].y(),
+                x1 = (int)feats1[cur_match._j].x(), y1 = (int)feats1[cur_match._j].y();
+
+        int xmin0 = std::max(halfWindowSize + 1, x0 - halfWindowSize),
+                xmax0 = std::min(image0.Width() - halfWindowSize, x0 + halfWindowSize + 1),
+                ymin0 = std::max(halfWindowSize + 1, y0 - halfWindowSize),
+                ymax0 = std::min(image0.Height() - halfWindowSize, y0 + halfWindowSize + 1);
+
+        int xmin1 = std::max(halfWindowSize + 1, x1 - halfWindowSize),
+                xmax1 = std::min(image1.Width() - halfWindowSize, x1 + halfWindowSize + 1),
+                ymin1 = std::max(halfWindowSize + 1, y1 - halfWindowSize),
+                ymax1 = std::min(image1.Height() - halfWindowSize, y1 + halfWindowSize + 1);
+
+        for(int xx0 = xmin0; xx0 <= xmax0; xx0++) {
+            for(int yy0 = ymin0; yy0 <= ymax0; yy0++) {
+                if(matched0(xx0, yy0)) {continue;}
+                int xx = xx0 - x0 + x1;
+                int yy = yy0 - y0 + y1;
+                for(int yy1 = std::max(ymin1, yy - 1); yy1 <= std::min(ymax1, yy + 2); yy1++) {
+                    for(int xx1 = std::max(xmin1, xx - 1); yy1 <= std::min(xmax1, xx + 2); xx1++) {
+                        if(!matched1(xx1, yy1)) {
+                            double correlation = zncc(image0, xx0, yy0, image1, xx1, yy1, halfWindowSize);
+                            if(correlation > 0.8) {
+                                PointFeature point0(xx0, yy0), point1(xx1, yy1);
+                                feats0.push_back(point0);
+                                feats1.push_back(point1);
+                                matched0(xx0, yy0) = 1;
+                                matched1(xx1, yy1) = 1;
+
+                                IndMatch new_match(feats0.size() - 1, feats1.size() - 1);
+                                pq_matches.push(new_match);
+
+                            }
+                        }
+                    }
+                }
+
+            }
+        }
+
+    } */
+
+
 
 
 
@@ -372,7 +439,20 @@ int main() {
 
 }
 
+struct cmp{
+    bool operator() ( IndMatch a, IndMatch b ){
+        IndexT a_left = a._i, a_right = a._j;
+        IndexT b_left = b._i, b_right = b._j;
+        features::PointFeature a_left_feat = feats0[a_left];
+        features::PointFeature a_right_feat = feats0[a_right];
+        features::PointFeature b_left_feat = feats1[b_left];
+        features::PointFeature b_right_feat = feats1[b_right];
 
+        double a_zncc = zncc(image0, (int)a_left_feat.x(), (int)a_left_feat.y(), image1, (int)a_right_feat.x(), (int)a_right_feat.y(), halfWindowSize);
+        double b_zncc = zncc(image0, (int)b_left_feat.x(), (int)b_left_feat.y(), image1, (int)b_right_feat.x(), (int)b_right_feat.y(), halfWindowSize);
+
+        return a_zncc > b_zncc; }
+};
 
 
 int readIntrinsic(const std::string & fileName, Mat3 & K)
@@ -465,11 +545,5 @@ double zncc(Image<unsigned char> image1, int x1, int y1, Image<unsigned char> im
     return ret;
 }
 
-/*
-struct cmp{
-    bool operator() ( IndMatch a, IndMatch b ){
-        if( a.x== b.x ) return a.y> b.y;
 
-        return a.x> b.x; }
-};
- */
+
