@@ -42,7 +42,8 @@ features::PointFeatures feats0;
 features::PointFeatures feats1;
 Image<unsigned char> image0;
 Image<unsigned char> image1;
-int halfWindowSize = 3;
+vector<size_t> inliers;
+int halfWindowSize = 2;
 
 struct cmp{
     bool operator() ( IndMatch a, IndMatch b ){
@@ -187,10 +188,10 @@ int main() {
                 svgDrawer svgStream( image_set[k].Width() + image_set[i].Width(), max(image_set[k].Height(), image_set[i].Height()));
                 svgStream.drawImage(filesname[k], image_set[k].Width(), image_set[k].Height());
                 svgStream.drawImage(filesname[i], image_set[i].Width(), image_set[i].Height(), image_set[k].Width());
-                for (size_t i = 0; i < vec_PutativeMatches.size(); ++i) {
+                for (size_t n = 0; n < vec_PutativeMatches.size(); ++n) {
                     //Get back linked feature, draw a circle and link them by a line
-                    const SIOPointFeature L = regionsL->Features()[vec_PutativeMatches[i]._i];
-                    const SIOPointFeature R = regionsR->Features()[vec_PutativeMatches[i]._j];
+                    const SIOPointFeature L = regionsL->Features()[vec_PutativeMatches[n]._i];
+                    const SIOPointFeature R = regionsR->Features()[vec_PutativeMatches[n]._j];
                     svgStream.drawLine(L.x(), L.y(), R.x()+image_set[k].Width(), R.y(), svgStyle().stroke("green", 2.0));
                     svgStream.drawCircle(L.x(), L.y(), L.scale(), svgStyle().stroke("yellow", 2.0));
                     svgStream.drawCircle(R.x()+image_set[k].Width(), R.y(), R.scale(), svgStyle().stroke("yellow", 2.0));
@@ -227,11 +228,32 @@ int main() {
                 return EXIT_FAILURE;
             }
 
+            inliers = relativePose_info.vec_inliers;
+
             std::cout << "\nFound an Essential matrix:\n"
             << "\tprecision: " << relativePose_info.found_residual_precision << " pixels\n"
             << "\t#inliers: " << relativePose_info.vec_inliers.size() << "\n"
             << "\t#matches: " << vec_PutativeMatches.size()
             << std::endl;
+
+
+            // Draw inlier matches
+            svgDrawer svgStream( image_set[k].Width() + image_set[i].Width(), max(image_set[k].Height(), image_set[i].Height()));
+            svgStream.drawImage(filesname[k], image_set[k].Width(), image_set[k].Height());
+            svgStream.drawImage(filesname[i], image_set[i].Width(), image_set[i].Height(), image_set[k].Width());
+            for (size_t n = 0; n < relativePose_info.vec_inliers.size(); ++n) {
+                //Get back linked feature, draw a circle and link them by a line
+                size_t num = relativePose_info.vec_inliers[n];
+                const SIOPointFeature L = regionsL->Features()[vec_PutativeMatches[num]._i];
+                const SIOPointFeature R = regionsR->Features()[vec_PutativeMatches[num]._j];
+                svgStream.drawLine(L.x(), L.y(), R.x()+image_set[k].Width(), R.y(), svgStyle().stroke("green", 2.0));
+                svgStream.drawCircle(L.x(), L.y(), L.scale(), svgStyle().stroke("yellow", 2.0));
+                svgStream.drawCircle(R.x()+image_set[k].Width(), R.y(), R.scale(), svgStyle().stroke("yellow", 2.0));
+            }
+            const std::string out_filename = "./Custom_SFM/" + std::to_string(k) + "_" + std::to_string(i) + "_inlierMatches.svg";
+            std::ofstream svgFile( out_filename.c_str() );
+            svgFile << svgStream.closeSvgFile().str();
+            svgFile.close();
 
             // Setup poses camera data
             sfm_data.poses[sfm_data.views[i]->id_pose] = relativePose_info.relativePose * sfm_data.poses[sfm_data.views[k]->id_pose];
@@ -325,7 +347,11 @@ int main() {
     }
 
     //perform dense match
-    vec_Matches = matches_provider._pairWise_matches.at(Pair(0, 1));
+
+    IndMatches vec_Matches_original = matches_provider._pairWise_matches.at(Pair(0, 1));
+    for(int n = 0; n < inliers.size(); ++n) {
+        vec_Matches.push_back(vec_Matches_original[inliers[n]]);
+    }
     feats0 = regions_perImage.at(0)->GetRegionsPositions();
     feats1 = regions_perImage.at(1)->GetRegionsPositions();
     image0 = image_set.at(0);
@@ -334,31 +360,40 @@ int main() {
     Mat matched0 = Mat::Zero(image0.Height(), image0.Width());
     Mat matched1 = Mat::Zero(image1.Height(), image1.Width());
 
-    cout << "matched0" << ", [" << matched0.rows() << ", " << matched0.cols() << "]" << endl;
-    cout << "15: [" << (int)feats0[vec_Matches[15]._i].x() << ", " << (int)feats0[vec_Matches[15]._i].y() << "], " <<
-    "[" << (int)feats1[vec_Matches[15]._j].x() << ", " << (int)feats1[vec_Matches[15]._j].y() << "]\n";
-
     std::priority_queue<IndMatch, vector<IndMatch>, cmp> pq_matches;
     int cnt = 0;
     int good_matches = 0;
+
+    // Draw correspondences after Nearest Neighbor ratio filter
+    svgDrawer svgStream( image0.Width() + image1.Width(), max(image0.Height(), image1.Height()));
+    svgStream.drawImage(filesname[0], image_set[0].Width(), image_set[0].Height());
+    svgStream.drawImage(filesname[1], image_set[1].Width(), image_set[1].Height(), image_set[0].Width());
+
     for(IndMatch match : vec_Matches) {
-        pq_matches.push(match);
-        cout << cnt++ <<
-                ", [" << (int)feats0[match._i].x() << ", " << (int)feats0[match._i].y() << "], " <<
-                "[" << (int)feats1[match._j].x() << ", " << (int)feats1[match._j].y() << "], ";
+        cnt++;
         matched0((int)feats0[match._i].y(), (int)feats0[match._i].x()) = 1;
         matched1((int)feats1[match._j].y(), (int)feats1[match._j].x()) = 1;
         double cur_zncc = zncc(image0, (int)feats0[match._i].x(), (int)feats0[match._i].y(), image1, (int)feats1[match._j].x(), (int)feats1[match._j].y(), halfWindowSize);
         if(cur_zncc > 0.5) {
             good_matches ++;
+            pq_matches.push(match);
+            svgStream.drawLine(feats0[match._i].x(), feats0[match._i].y(), feats1[match._j].x() + image_set[0].Width(), feats1[match._j].y(), svgStyle().stroke("green", 2.0));
+            svgStream.drawCircle(feats0[match._i].x(), feats0[match._i].y(), 2, svgStyle().stroke("yellow", 2.0));
+            svgStream.drawCircle(feats1[match._j].x() + image_set[0].Width(), feats1[match._j].y(), 2, svgStyle().stroke("yellow", 2.0));
+            cout << good_matches <<
+            ", [" << (int)feats0[match._i].x() << ", " << (int)feats0[match._i].y() << "], " <<
+            "[" << (int)feats1[match._j].x() << ", " << (int)feats1[match._j].y() << "]" << endl;
         }
-        cout <<"correlation between matched points: " << cur_zncc << endl;
+        //cout <<"correlation between matched points: " << cur_zncc << endl;
     }
+
     cout << good_matches <<" good matches in " << vec_Matches.size() << " total matches." << endl;
 
     cout << "zncc test: " << zncc(image0, 100, 100, image0, 100, 100, halfWindowSize) << endl;
 
-/*    while(!pq_matches.empty()) {
+    int new_matches = 0;
+
+    while(!pq_matches.empty()) {
         IndMatch cur_match = pq_matches.top();
         pq_matches.pop();
 
@@ -375,25 +410,39 @@ int main() {
                 ymin1 = std::max(halfWindowSize + 1, y1 - halfWindowSize),
                 ymax1 = std::min(image1.Height() - halfWindowSize, y1 + halfWindowSize + 1);
 
-        for(int xx0 = xmin0; xx0 <= xmax0; xx0++) {
-            for(int yy0 = ymin0; yy0 <= ymax0; yy0++) {
-                if(matched0(xx0, yy0)) {continue;}
-                int xx = xx0 - x0 + x1;
-                int yy = yy0 - y0 + y1;
-                for(int yy1 = std::max(ymin1, yy - 1); yy1 <= std::min(ymax1, yy + 2); yy1++) {
-                    for(int xx1 = std::max(xmin1, xx - 1); yy1 <= std::min(xmax1, xx + 2); xx1++) {
-                        if(!matched1(xx1, yy1)) {
-                            double correlation = zncc(image0, xx0, yy0, image1, xx1, yy1, halfWindowSize);
-                            if(correlation > 0.8) {
-                                PointFeature point0(xx0, yy0), point1(xx1, yy1);
-                                feats0.push_back(point0);
-                                feats1.push_back(point1);
-                                matched0(xx0, yy0) = 1;
-                                matched1(xx1, yy1) = 1;
+        int local_matches = 0;
+        for(int yy0 = ymin0; yy0 < ymax0 && local_matches < 5; yy0++) {
+            for(int xx0 = xmin0; xx0 < xmax0 && local_matches < 5; xx0++) {
+                if(!matched0(yy0, xx0)) {
+                    int xx = xx0 - x0 + x1;
+                    int yy = yy0 - y0 + y1;
+                    for (int yy1 = std::max(ymin1, yy - 1); yy1 < std::min(ymax1, yy + 2) && local_matches < 5; yy1++) {
+                        for (int xx1 = std::max(xmin1, xx - 1); xx1 < std::min(xmax1, xx + 2) && local_matches < 5; xx1++) {
+                            if (!matched1(yy1, xx1) && !matched0(yy0, xx0)) {
+                                double correlation = zncc(image0, xx0, yy0, image1, xx1, yy1, halfWindowSize);
+                                if (correlation > 0.9) {
+                                    PointFeature point0(xx0, yy0), point1(xx1, yy1);
+                                    feats0.push_back(point0);
+                                    feats1.push_back(point1);
+                                    matched0(yy0, xx0) = 1;
+                                    matched1(yy1, xx1) = 1;
 
-                                IndMatch new_match(feats0.size() - 1, feats1.size() - 1);
-                                pq_matches.push(new_match);
+                                    IndMatch new_match(feats0.size() - 1, feats1.size() - 1);
+                                    pq_matches.push(new_match);
+                                    vec_Matches.push_back(new_match);
+                                    new_matches++;
+                                    local_matches++;
 
+                                    cout << new_matches << " new match at" <<
+                                    ", [" << xx0 << ", " << yy0 << "], " <<
+                                    "[" << xx1 << ", " << yy1 << "], " << local_matches << " local matches" << endl;
+
+                                    svgStream.drawLine(xx0, yy0, xx1 + image_set[0].Width(), yy1,
+                                                       svgStyle().stroke("red", 2.0));
+                                    svgStream.drawCircle(xx0, yy0, 2, svgStyle().stroke("white", 2.0));
+                                    svgStream.drawCircle(xx1 + image_set[0].Width(), yy1, 2,
+                                                         svgStyle().stroke("white", 2.0));
+                                }
                             }
                         }
                     }
@@ -402,7 +451,57 @@ int main() {
             }
         }
 
-    } */
+        //if(new_matches > 500) {break;}
+
+    }
+    cout << "New matches number: " << new_matches << endl;
+    const std::string out_filename = "./Custom_SFM/" + std::to_string(0) + "_" + std::to_string(1) + "_refinedMatches.svg";
+    std::ofstream svgFile( out_filename.c_str() );
+    svgFile << svgStream.closeSvgFile().str();
+    svgFile.close();
+
+    // Triangulate again based on dense match
+    // invalid points that do not respect cheirality are discarded (removed
+    //  from the list of inliers).
+    const Pose3 pose0 = sfm_data.poses[sfm_data.views[0]->id_pose];
+    const Pose3 pose1 = sfm_data.poses[sfm_data.views[1]->id_pose];
+
+    // Init structure by inlier triangulation
+    //get projection matrix
+    const Mat34 P1 = sfm_data.intrinsics[sfm_data.views[0]->id_intrinsic]->get_projective_equivalent(pose0);
+    const Mat34 P2 = sfm_data.intrinsics[sfm_data.views[1]->id_intrinsic]->get_projective_equivalent(pose1);
+    Landmarks &landmarks = sfm_data.structure;
+    for (size_t j = 0; j < vec_Matches.size(); ++j) {
+        const PointFeature &LL = feats0[vec_Matches[j]._i];
+        const PointFeature &RR = feats1[vec_Matches[j]._j];
+
+        // Point triangulation
+        int new_track_id = landmarks.size();
+        Vec3 X;
+        TriangulateDLT(P1, LL.coords().cast<double>(), P2, RR.coords().cast<double>(), &X);
+        // Reject point that is behind the camera
+        if (pose0.depth(X) < 0 && pose1.depth(X) < 0)
+            continue;
+        // Add a new landmark (3D point with it's 2d observations)
+        landmarks[new_track_id].obs[sfm_data.views[0]->id_view] = Observation(
+                LL.coords().cast<double>(), vec_Matches[j]._i);
+        landmarks[new_track_id].obs[sfm_data.views[1]->id_view] = Observation(RR.coords().cast<double>(),
+                                                                              vec_Matches[j]._j);
+        landmarks[new_track_id].X = X;
+        RGBColor RGBL = imageRGB_set[0]((int) LL.coords()[1], (int) LL.coords()[0]);
+        RGBColor RGBR = imageRGB_set[1]((int) LL.coords()[1], (int) LL.coords()[0]);
+
+        landmarks[new_track_id].RGB = Vec3((RGBL.r() + RGBR.r()) / 2, (RGBL.g() + RGBR.g()) / 2,
+                                           (RGBL.b() + RGBR.b()) / 2);
+    }
+
+    //D. Perform Bundle Adjustment of the scene
+
+    Bundle_Adjustment_Ceres bundle_adjustment_obj;
+    bundle_adjustment_obj.Adjust(sfm_data);
+
+    std::string output = "./Custom_SFM/dense_" + std::to_string(0) + "_" + std::to_string(1) + ".ply";
+    Save(sfm_data, output, ESfM_Data(ALL));
 
 
 
