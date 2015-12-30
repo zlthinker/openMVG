@@ -42,7 +42,7 @@ features::PointFeatures feats0;
 features::PointFeatures feats1;
 Image<unsigned char> image0;
 Image<unsigned char> image1;
-int halfWindowSize = 2;
+int halfWindowSize = 3;
 
 struct cmp{
     bool operator() ( IndMatch a, IndMatch b ){
@@ -193,7 +193,7 @@ int main() {
                     const SIOPointFeature R = regionsR->Features()[vec_PutativeMatches[i]._j];
                     svgStream.drawLine(L.x(), L.y(), R.x()+image_set[k].Width(), R.y(), svgStyle().stroke("green", 2.0));
                     svgStream.drawCircle(L.x(), L.y(), L.scale(), svgStyle().stroke("yellow", 2.0));
-                    svgStream.drawCircle(R.x()+image_set[k].Width(), R.y(), R.scale(),svgStyle().stroke("yellow", 2.0));
+                    svgStream.drawCircle(R.x()+image_set[k].Width(), R.y(), R.scale(), svgStyle().stroke("yellow", 2.0));
                 }
                 const std::string out_filename = "./Custom_SFM/" + std::to_string(k) + "_" + std::to_string(i) + "_siftMatches.svg";
                 std::ofstream svgFile( out_filename.c_str() );
@@ -331,18 +331,32 @@ int main() {
     image0 = image_set.at(0);
     image1 = image_set.at(1);
 
-    Mat matched0 = Mat::Zero(image0.Width(), image0.Height());
-    Mat matched1 = Mat::Zero(image1.Width(), image1.Height());
+    Mat matched0 = Mat::Zero(image0.Height(), image0.Width());
+    Mat matched1 = Mat::Zero(image1.Height(), image1.Width());
+
+    cout << "matched0" << ", [" << matched0.rows() << ", " << matched0.cols() << "]" << endl;
+    cout << "15: [" << (int)feats0[vec_Matches[15]._i].x() << ", " << (int)feats0[vec_Matches[15]._i].y() << "], " <<
+    "[" << (int)feats1[vec_Matches[15]._j].x() << ", " << (int)feats1[vec_Matches[15]._j].y() << "]\n";
 
     std::priority_queue<IndMatch, vector<IndMatch>, cmp> pq_matches;
     int cnt = 0;
+    int good_matches = 0;
     for(IndMatch match : vec_Matches) {
         pq_matches.push(match);
-        matched0((int)feats0[match._i].x(), (int)feats0[match._i].y()) = 1;
-        matched1((int)feats1[match._j].x(), (int)feats1[match._j].y()) = 1;
+        cout << cnt++ <<
+                ", [" << (int)feats0[match._i].x() << ", " << (int)feats0[match._i].y() << "], " <<
+                "[" << (int)feats1[match._j].x() << ", " << (int)feats1[match._j].y() << "], ";
+        matched0((int)feats0[match._i].y(), (int)feats0[match._i].x()) = 1;
+        matched1((int)feats1[match._j].y(), (int)feats1[match._j].x()) = 1;
         double cur_zncc = zncc(image0, (int)feats0[match._i].x(), (int)feats0[match._i].y(), image1, (int)feats1[match._j].x(), (int)feats1[match._j].y(), halfWindowSize);
-        cout << cnt++ << ": correlation between matched points: " << cur_zncc << endl;
+        if(cur_zncc > 0.5) {
+            good_matches ++;
+        }
+        cout <<"correlation between matched points: " << cur_zncc << endl;
     }
+    cout << good_matches <<" good matches in " << vec_Matches.size() << " total matches." << endl;
+
+    cout << "zncc test: " << zncc(image0, 100, 100, image0, 100, 100, halfWindowSize) << endl;
 
 /*    while(!pq_matches.empty()) {
         IndMatch cur_match = pq_matches.top();
@@ -531,11 +545,17 @@ double zncc(Image<unsigned char> image1, int x1, int y1, Image<unsigned char> im
         for(int j = -halfWindowSize; j <= halfWindowSize; j++) {
             int xx1 = x1 + i, yy1 = y1 + j;
             int xx2 = x2 + i, yy2 = y2 + j;
-            SI += image1(xx1, yy1) / 256.0;
-            SJ += image2(xx2, yy2) / 256.0;
-            SII += std::pow(image1(xx1, yy1) / 256.0, 2);
-            SJJ += std::pow(image2(xx2, yy2) / 256.0, 2);
-            SIJ += (image1(xx1, yy1) / 256.0) * (image2(xx2, yy2) / 256.0);
+            if(xx1 < 0 || xx1 > image1.Width() || yy1 < 0 || yy1 > image1.Height()) {
+                return -3;
+            }
+            if(xx2 < 0 || xx2 > image2.Width() || yy2 < 0 || yy2 > image2.Height()) {
+                return -3;
+            }
+            SI += image1(yy1, xx1) / 256.0;
+            SJ += image2(yy2, xx2) / 256.0;
+            SII += std::pow(image1(yy1, xx1) / 256.0, 2);
+            SJJ += std::pow(image2(yy2, xx2) / 256.0, 2);
+            SIJ += (image1(yy1, xx1) / 256.0) * (image2(yy2, xx2) / 256.0);
         }
     }
 
