@@ -36,6 +36,8 @@ using namespace std;
 /// 0 0 1
 int readIntrinsic(const std::string & fileName, Mat3 & K);
 double zncc(Image<unsigned char> image1, int x1, int y1, Image<unsigned char> image2, int x2, int y2, int halfWindowSize);
+double ncc(Image<unsigned char> image1, int x1, int y1, Image<unsigned char> image2, int x2, int y2, int halfWindowSize);
+double zncc_rgb(Image<RGBColor> image1, int x1, int y1, Image<RGBColor> image2, int x2, int y2, int halfWindowSize);
 
 IndMatches vec_Matches;
 features::PointFeatures feats0;
@@ -249,11 +251,13 @@ int main() {
                 svgStream.drawLine(L.x(), L.y(), R.x()+image_set[k].Width(), R.y(), svgStyle().stroke("green", 2.0));
                 svgStream.drawCircle(L.x(), L.y(), L.scale(), svgStyle().stroke("yellow", 2.0));
                 svgStream.drawCircle(R.x()+image_set[k].Width(), R.y(), R.scale(), svgStyle().stroke("yellow", 2.0));
+                cout << "Scale comparison: " << L.scale() << ", " << R.scale() << endl;
             }
-            const std::string out_filename = "./Custom_SFM/" + std::to_string(k) + "_" + std::to_string(i) + "_inlierMatches.svg";
+            const std::string out_filename = "./Custom_SFM_new/" + std::to_string(k) + "_" + std::to_string(i) + "_inlierMatches.svg";
             std::ofstream svgFile( out_filename.c_str() );
             svgFile << svgStream.closeSvgFile().str();
             svgFile.close();
+
 
             // Setup poses camera data
             sfm_data.poses[sfm_data.views[i]->id_pose] = relativePose_info.relativePose * sfm_data.poses[sfm_data.views[k]->id_pose];
@@ -317,6 +321,8 @@ int main() {
                     int new_track_id = landmarks.size();
                     Vec3 X;
                     TriangulateDLT(P1, LL.coords().cast<double>(), P2, RR.coords().cast<double>(), &X);
+                    cout << "Pose depth comparison: " << pose0.depth(X) << ", " << sfm_data
+
                     // Reject point that is behind the camera
                     if (pose0.depth(X) < 0 && pose1.depth(X) < 0)
                         continue;
@@ -341,10 +347,11 @@ int main() {
             Bundle_Adjustment_Ceres bundle_adjustment_obj;
             bundle_adjustment_obj.Adjust(sfm_data);
 
-            std::string output = "./Custom_SFM/sparse_" + std::to_string(k) + "_" + std::to_string(i) + ".ply";
+            std::string output = "./Custom_SFM_new/sparse_" + std::to_string(k) + "_" + std::to_string(i) + ".ply";
             Save(sfm_data, output, ESfM_Data(ALL));
         }
     }
+
 
     //perform dense match
 
@@ -356,6 +363,9 @@ int main() {
     feats1 = regions_perImage.at(1)->GetRegionsPositions();
     image0 = image_set.at(0);
     image1 = image_set.at(1);
+    Image<RGBColor> image0_rgb = imageRGB_set[0];
+    Image<RGBColor> image1_rgb = imageRGB_set[1];
+
 
     Mat matched0 = Mat::Zero(image0.Height(), image0.Width());
     Mat matched1 = Mat::Zero(image1.Height(), image1.Width());
@@ -369,28 +379,42 @@ int main() {
     svgStream.drawImage(filesname[0], image_set[0].Width(), image_set[0].Height());
     svgStream.drawImage(filesname[1], image_set[1].Width(), image_set[1].Height(), image_set[0].Width());
 
+    cout << "Intensity: " << endl;
     for(IndMatch match : vec_Matches) {
         cnt++;
+        if(cnt == 2) {
+            for(int size = -2; size < 3; size++) {
+                for(int size_y = -2; size_y < 3; size_y++) {
+                    cout << (int)image0((int)feats0[match._i].y() + size_y, (int)feats0[match._i].x() + size) <<
+                            " ," << (int)image1((int)feats1[match._j].y() + size_y, (int)feats1[match._j].x() + size) << endl;
+                    svgStream.drawCircle(feats0[match._i].x(), feats0[match._i].y(), 4, svgStyle().stroke("yellow", 0.5));
+                    svgStream.drawSquare(feats0[match._i].x() - 2.5, feats0[match._i].y() - 2.5, 5, svgStyle().stroke("red", 0.5));
+                    svgStream.drawCircle(feats1[match._j].x() + image_set[0].Width(), feats1[match._j].y(), 4, svgStyle().stroke("yellow", 0.5));
+                    svgStream.drawSquare(feats1[match._j].x() - 2.5 + image_set[0].Width(), feats1[match._j].y() - 2.5, 5, svgStyle().stroke("red", 0.5));
+                }
+            }
+        }
         matched0((int)feats0[match._i].y(), (int)feats0[match._i].x()) = 1;
         matched1((int)feats1[match._j].y(), (int)feats1[match._j].x()) = 1;
-        double cur_zncc = zncc(image0, (int)feats0[match._i].x(), (int)feats0[match._i].y(), image1, (int)feats1[match._j].x(), (int)feats1[match._j].y(), halfWindowSize);
-        if(cur_zncc > 0.5) {
+        double cur_zncc = ncc(image0, (int)feats0[match._i].x(), (int)feats0[match._i].y(), image1, (int)feats1[match._j].x(), (int)feats1[match._j].y(), halfWindowSize);
+        if(cur_zncc < 0.3) {
             good_matches ++;
             pq_matches.push(match);
-            svgStream.drawLine(feats0[match._i].x(), feats0[match._i].y(), feats1[match._j].x() + image_set[0].Width(), feats1[match._j].y(), svgStyle().stroke("green", 2.0));
-            svgStream.drawCircle(feats0[match._i].x(), feats0[match._i].y(), 2, svgStyle().stroke("yellow", 2.0));
-            svgStream.drawCircle(feats1[match._j].x() + image_set[0].Width(), feats1[match._j].y(), 2, svgStyle().stroke("yellow", 2.0));
-            cout << good_matches <<
-            ", [" << (int)feats0[match._i].x() << ", " << (int)feats0[match._i].y() << "], " <<
-            "[" << (int)feats1[match._j].x() << ", " << (int)feats1[match._j].y() << "]" << endl;
+            //svgStream.drawLine(feats0[match._i].x(), feats0[match._i].y(), feats1[match._j].x() + image_set[0].Width(), feats1[match._j].y(), svgStyle().stroke("green", 2.0));
+            //svgStream.drawCircle(feats0[match._i].x(), feats0[match._i].y(), 2, svgStyle().stroke("yellow", 2.0));
+            //svgStream.drawCircle(feats1[match._j].x() + image_set[0].Width(), feats1[match._j].y(), 2, svgStyle().stroke("yellow", 2.0));
         }
         //cout <<"correlation between matched points: " << cur_zncc << endl;
+        cout << cnt <<
+        ", [" << (int)feats0[match._i].x() << ", " << (int)feats0[match._i].y() << "], " <<
+        "[" << (int)feats1[match._j].x() << ", " << (int)feats1[match._j].y() << "], " << cur_zncc << endl;
     }
 
     cout << good_matches <<" good matches in " << vec_Matches.size() << " total matches." << endl;
 
-    cout << "zncc test: " << zncc(image0, 100, 100, image0, 100, 100, halfWindowSize) << endl;
+    cout << "zncc test: " << ncc(image0, 100, 100, image0, 100, 100, halfWindowSize) << endl;
 
+    /*
     int new_matches = 0;
 
     while(!pq_matches.empty()) {
@@ -411,13 +435,13 @@ int main() {
                 ymax1 = std::min(image1.Height() - halfWindowSize, y1 + halfWindowSize + 1);
 
         int local_matches = 0;
-        for(int yy0 = ymin0; yy0 < ymax0 && local_matches < 5; yy0++) {
-            for(int xx0 = xmin0; xx0 < xmax0 && local_matches < 5; xx0++) {
+        for(int yy0 = ymin0; yy0 < ymax0 && local_matches < 50; yy0++) {
+            for(int xx0 = xmin0; xx0 < xmax0 && local_matches < 50; xx0++) {
                 if(!matched0(yy0, xx0)) {
                     int xx = xx0 - x0 + x1;
                     int yy = yy0 - y0 + y1;
-                    for (int yy1 = std::max(ymin1, yy - 1); yy1 < std::min(ymax1, yy + 2) && local_matches < 5; yy1++) {
-                        for (int xx1 = std::max(xmin1, xx - 1); xx1 < std::min(xmax1, xx + 2) && local_matches < 5; xx1++) {
+                    for (int yy1 = std::max(ymin1, yy - 1); yy1 < std::min(ymax1, yy + 2) && local_matches < 50; yy1++) {
+                        for (int xx1 = std::max(xmin1, xx - 1); xx1 < std::min(xmax1, xx + 2) && local_matches < 50; xx1++) {
                             if (!matched1(yy1, xx1) && !matched0(yy0, xx0)) {
                                 double correlation = zncc(image0, xx0, yy0, image1, xx1, yy1, halfWindowSize);
                                 if (correlation > 0.9) {
@@ -428,7 +452,7 @@ int main() {
                                     matched1(yy1, xx1) = 1;
 
                                     IndMatch new_match(feats0.size() - 1, feats1.size() - 1);
-                                    pq_matches.push(new_match);
+                                    //pq_matches.push(new_match);
                                     vec_Matches.push_back(new_match);
                                     new_matches++;
                                     local_matches++;
@@ -455,10 +479,15 @@ int main() {
 
     }
     cout << "New matches number: " << new_matches << endl;
-    const std::string out_filename = "./Custom_SFM/" + std::to_string(0) + "_" + std::to_string(1) + "_refinedMatches.svg";
+
+     */
+
+    const std::string out_filename = "./Custom_SFM_new/" + std::to_string(0) + "_" + std::to_string(1) + "_refinedMatches.svg";
     std::ofstream svgFile( out_filename.c_str() );
     svgFile << svgStream.closeSvgFile().str();
     svgFile.close();
+
+    /*
 
     // Triangulate again based on dense match
     // invalid points that do not respect cheirality are discarded (removed
@@ -500,9 +529,10 @@ int main() {
     Bundle_Adjustment_Ceres bundle_adjustment_obj;
     bundle_adjustment_obj.Adjust(sfm_data);
 
-    std::string output = "./Custom_SFM/dense_" + std::to_string(0) + "_" + std::to_string(1) + ".ply";
-    Save(sfm_data, output, ESfM_Data(ALL));
 
+    std::string output = "./Custom_SFM_new/dense_" + std::to_string(0) + "_" + std::to_string(1) + ".ply";
+    Save(sfm_data, output, ESfM_Data(ALL));
+*/
 
 
 
@@ -615,6 +645,8 @@ int readIntrinsic(const std::string & fileName, Mat3 & K)
 
 }
 
+
+
 double zncc(Image<unsigned char> image1, int x1, int y1, Image<unsigned char> image2, int x2, int y2, int halfWindowSize) {
 /*    int xmin1 = std::max(0, x1 - halfWindowSize);
     int xmax1 = std::min(image1.Width() - 1, x1 + halfWindowSize);
@@ -664,5 +696,108 @@ double zncc(Image<unsigned char> image1, int x1, int y1, Image<unsigned char> im
     return ret;
 }
 
+double zncc_rgb(Image<RGBColor> image1, int x1, int y1, Image<RGBColor> image2, int x2, int y2, int halfWindowSize) {
+
+    if(x1 - halfWindowSize < 0 || x1 + halfWindowSize > image1.Width() - 1) {
+        return -2;
+    }
+    if(x2 - halfWindowSize < 0 || x2 + halfWindowSize > image2.Width() - 1) {
+        return -2;
+    }
+    if(y1 - halfWindowSize < 0 || y1 + halfWindowSize > image1.Height() - 1) {
+        return -2;
+    }
+    if(y2 - halfWindowSize < 0 || y2 + halfWindowSize > image2.Height() - 1) {
+        return -2;
+    }
+
+    vector<double> SI(3, 0), SJ(3, 0);
+    double SII = 0, SJJ = 0, SIJ = 0;
+    for(int i = -halfWindowSize; i <= halfWindowSize; i++) {
+        for(int j = -halfWindowSize; j <= halfWindowSize; j++) {
+            int xx1 = x1 + i, yy1 = y1 + j;
+            int xx2 = x2 + i, yy2 = y2 + j;
+            if(xx1 < 0 || xx1 > image1.Width() || yy1 < 0 || yy1 > image1.Height()) {
+                return -3;
+            }
+            if(xx2 < 0 || xx2 > image2.Width() || yy2 < 0 || yy2 > image2.Height()) {
+                return -3;
+            }
+            SI[0] += image1(yy1, xx1).r() / 256.0;
+            SI[1] += image1(yy1, xx1).g() / 256.0;
+            SI[2] += image1(yy1, xx1).b() / 256.0;
+            SJ[0] += image2(yy2, xx2).r() / 256.0;
+            SJ[1] += image2(yy2, xx2).g() / 256.0;
+            SJ[2] += image2(yy2, xx2).b() / 256.0;
+            SII += std::pow(image1(yy1, xx1).r() / 256.0, 2) + std::pow(image1(yy1, xx1).g() / 256.0, 2) + std::pow(image1(yy1, xx1).b() / 256.0, 2);
+            SJJ += std::pow(image2(yy2, xx2).r() / 256.0, 2) + std::pow(image2(yy2, xx2).g() / 256.0, 2) + std::pow(image2(yy2, xx2).b() / 256.0, 2);
+            SIJ += (image1(yy1, xx1).r() / 256.0) * (image2(yy2, xx2).r() / 256.0) +
+                    (image1(yy1, xx1).g() / 256.0) * (image2(yy2, xx2).g() / 256.0) + (image1(yy1, xx1).b() / 256.0) * (image2(yy2, xx2).b() / 256.0);
+        }
+    }
+
+    int N = std::pow(2 * halfWindowSize + 1, 2);
+    double SIxSJ = SI[0] * SJ[0] + SI[1] * SJ[1] + SI[2] * SJ[2];
+    double SIxSI = SI[0] * SI[0] + SI[1] * SI[1] + SI[2] * SI[2];
+    double SJxSJ = SJ[0] * SJ[0] + SJ[1] * SJ[1] + SJ[2] * SJ[2];
+    double ret = (N * SIJ - SIxSJ) / std::sqrt((N * SII - SIxSI) * (N * SJJ - SJxSJ));
+
+    return ret;
+}
 
 
+double ncc(Image<unsigned char> image1, int x1, int y1, Image<unsigned char> image2, int x2, int y2, int halfWindowSize) {
+
+    if(x1 - halfWindowSize < 0 || x1 + halfWindowSize > image1.Width() - 1) {
+        return -2;
+    }
+    if(x2 - halfWindowSize < 0 || x2 + halfWindowSize > image2.Width() - 1) {
+        return -2;
+    }
+    if(y1 - halfWindowSize < 0 || y1 + halfWindowSize > image1.Height() - 1) {
+        return -2;
+    }
+    if(y2 - halfWindowSize < 0 || y2 + halfWindowSize > image2.Height() - 1) {
+        return -2;
+    }
+
+    int N = std::pow(2 * halfWindowSize + 1, 2);
+    double SI = 0, SJ = 0;
+    for(int i = -halfWindowSize; i <= halfWindowSize; i++) {
+        for(int j = -halfWindowSize; j <= halfWindowSize; j++) {
+            int xx1 = x1 + i, yy1 = y1 + j;
+            int xx2 = x2 + i, yy2 = y2 + j;
+            if(xx1 < 0 || xx1 > image1.Width() || yy1 < 0 || yy1 > image1.Height()) {
+                return -3;
+            }
+            if(xx2 < 0 || xx2 > image2.Width() || yy2 < 0 || yy2 > image2.Height()) {
+                return -3;
+            }
+            SI += image1(yy1, xx1) / 256.0;
+            SJ += image2(yy2, xx2) / 256.0;
+        }
+    }
+    SI = SI / N; SJ = SJ / N;
+
+
+    double SIJ = 0, SII = 0, SJJ = 0;
+    for(int i = -halfWindowSize; i <= halfWindowSize; i++) {
+        for(int j = -halfWindowSize; j <= halfWindowSize; j++) {
+            int xx1 = x1 + i, yy1 = y1 + j;
+            int xx2 = x2 + i, yy2 = y2 + j;
+            if(xx1 < 0 || xx1 > image1.Width() || yy1 < 0 || yy1 > image1.Height()) {
+                return -3;
+            }
+            if(xx2 < 0 || xx2 > image2.Width() || yy2 < 0 || yy2 > image2.Height()) {
+                return -3;
+            }
+            SIJ += (image1(yy1, xx1) / 256.0) * (image2(yy2, xx2) / 256.0);
+            SII += (image1(yy1, xx1) / 256.0) * (image1(yy1, xx1) / 256.0);
+            SJJ += (image2(yy2, xx2) / 256.0) * (image2(yy2, xx2) / 256.0);
+        }
+    }
+
+    double ret = SIJ / sqrt(SII * SJJ);
+
+    return ret;
+}
