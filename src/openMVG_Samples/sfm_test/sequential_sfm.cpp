@@ -260,6 +260,8 @@ int main() {
 
 
             // Setup poses camera data
+            //to-do: add scale correction in camera poses in sequential sfm, because relative pose ignores scale information
+
             sfm_data.poses[sfm_data.views[i]->id_pose] = relativePose_info.relativePose * sfm_data.poses[sfm_data.views[k]->id_pose];
 
             cout << "pose number " << sfm_data.views[k]->id_pose << ": \n"
